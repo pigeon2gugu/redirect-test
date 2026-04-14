@@ -13,8 +13,8 @@ export default async function HomePage() {
         <p>
           This app mirrors the real flow with four routes:{" "}
           <code>/dashboard</code>, <code>/verify-identity</code>,{" "}
-          <code>/onboarding</code>, and <code>/complete</code>. Each target page
-          prepares the next server state, and the button only performs{" "}
+          <code>/onboarding</code>, and <code>/complete</code>. The gated target
+          buttons prepare the next server state via a server action, then call {" "}
           <code>router.replace("/dashboard")</code>.
         </p>
       </div>

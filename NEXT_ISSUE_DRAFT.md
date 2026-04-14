@@ -7,17 +7,17 @@ I created this repro to compare stock Next behavior against a small local `Redir
 The reproduction app has a small state machine:
 
 - `/dashboard` server-redirects based on cookie state
-- `/verify-identity` prepares `onboarding` on mount, then the button only calls `router.replace("/dashboard")`
-- `/onboarding` prepares `complete` on mount, then the button only calls `router.replace("/dashboard")`
+- `/verify-identity` has a button that first prepares `onboarding` via a server action, then calls `router.replace("/dashboard")`
+- `/onboarding` has a button that first prepares `complete` via a server action, then calls `router.replace("/dashboard")`
 - `/complete` is the terminal page
 
-The important part is that the button itself does not mutate server state. It only triggers re-entry into the dashboard route.
+The important part is that the gated routes do not auto-advance on mount. Progression happens when the button prepares the next server state and re-enters the dashboard route.
 
 ### Link to the code that reproduces this issue
 
 Replace this with your repro repository URL:
 
-`<REPO_URL>`
+https://github.com/pigeon2gugu/redirect-test
 
 ### To Reproduce
 
@@ -26,32 +26,25 @@ Replace this with your repro repository URL:
 3. Run `pnpm dev`
 4. Open `/dashboard`
 5. Allow the app to redirect to `/verify-identity`
-6. Wait until the page prepares the next cookie state (`onboarding`)
-7. Click the button that only calls `router.replace("/dashboard")`
-8. Observe that the same preserved route instance can appear more than once before moving forward
-9. Repeat the same comparison with `pnpm patch:on`
+6. Click the button that prepares `onboarding` and then calls `router.replace("/dashboard")`
+7. Observe whether `/verify-identity` appears again before the app reaches `/onboarding`
+8. On `/onboarding`, click the button that prepares `complete` and then calls `router.replace("/dashboard")`
+9. Observe whether `/onboarding` appears again before the app reaches `/complete`
+10. Repeat the same comparison with `pnpm patch:on`
 
 ### Current behavior
 
-With `pnpm patch:off`, I observe duplicate appearances of the same route with the same `mountId` before the flow moves forward.
+With `pnpm patch:off`, I can reproduce duplicate visible participation of the same stage before the flow moves forward.
 
-Observed sequence:
+Typical visible sequence:
 
-- `verify1`
-- `verify2`
-- `onboarding1`
-- `onboarding2`
+- `verify`
+- `verify`
+- `onboarding`
+- `onboarding`
 - `complete`
 
-Observed debug values:
-
-- `verify1`: `mountId: 1`, `renderCount: 4`, `effectCycles: 2`, `cleanupCount: 1`
-- `verify2`: `mountId: 1`, `renderCount: 6`, `effectCycles: 3`, `cleanupCount: 2`
-- `onboarding1`: `mountId: 2`, `renderCount: 4`, `effectCycles: 2`, `cleanupCount: 1`
-- `onboarding2`: `mountId: 2`, `renderCount: 6`, `effectCycles: 3`, `cleanupCount: 2`
-- `complete`: `mountId: 3`, `renderCount: 2`, `effectCycles: 1`, `cleanupCount: 0`
-
-This suggests that the same preserved route instance is re-participating in the flow.
+This suggests that a preserved route is re-participating in redirect handling during forward navigation when it should no longer affect the active route.
 
 ### Expected behavior
 
@@ -62,18 +55,6 @@ With stock behavior, I would expect the flow to move forward once per stage:
 - `complete`
 
 When I apply the local patch (`pnpm patch:on`), that is exactly what happens.
-
-Observed patched sequence:
-
-- `verify`
-- `onboarding`
-- `complete`
-
-Observed debug values:
-
-- `verify`: `mountId: 1`, `renderCount: 4`, `effectCycles: 2`, `cleanupCount: 1`
-- `onboarding`: `mountId: 2`, `renderCount: 4`, `effectCycles: 2`, `cleanupCount: 1`
-- `complete`: `mountId: 3`, `renderCount: 2`, `effectCycles: 1`, `cleanupCount: 0`
 
 The important distinction is that the patch does not remove `Activity` preservation or effect replay. It only prevents inactive preserved `RedirectBoundary` instances from executing redirect side effects again.
 
@@ -168,7 +149,7 @@ Yes. I also reproduced the issue on stock canary.
 This was the version resolved by `pnpm add next@canary` at the time of testing.
 
 - tested canary version: `16.2.1-canary.38`
-- result: the duplicate preserved-instance behavior still reproduces with `pnpm patch:off`
+- result: the duplicated visible-stage behavior still reproduces with `pnpm patch:off`
 - note: I did not re-apply the local patch comparison on canary yet, because the current patch snapshots were prepared against `16.2.2`
 
 ### Provide environment information
@@ -189,15 +170,16 @@ This was the version resolved by `pnpm add next@canary` at the time of testing.
 ### Which stage(s) are affected?
 
 - `next dev`
+- `next build` + `next start`
 
 ### Additional context
 
-I realize this is still a framework-behavior repro rather than a fully minimized proof of the exact production sequence that originally motivated the investigation.
+I previously used extra debug instrumentation to confirm more internal details, but this repository is intentionally kept simpler now.
 
-However, this repro does show a meaningful A/B difference on stable, and the stock canary still reproduces the problematic behavior:
+The current repro still shows a meaningful A/B difference on stable, and the stock canary still reproduces the problematic behavior:
 
-- stock stable: duplicated route participation from the same preserved instance
+- stock stable: duplicated visible stage participation during forward navigation
 - patched stable: one forward transition per stage
-- stock canary: duplicated preserved-instance behavior still reproduces
+- stock canary: duplicated visible-stage behavior still reproduces
 
 That seems consistent with a hidden preserved `RedirectBoundary` being able to re-run redirect handling when it should no longer affect the active route.

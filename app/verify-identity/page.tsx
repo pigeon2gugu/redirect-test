@@ -1,10 +1,7 @@
-import { Suspense } from "react";
-
-import { DebugPanel } from "@/components/debug-panel";
-import { GoDashboardButton } from "@/components/go-dashboard-button";
-import { PrepareOnboarding } from "@/components/prepare-onboarding";
+import { GoToOnboardingButton } from "@/components/go-to-onboarding-button";
 import { ResetButton } from "@/components/reset-button";
 import { getReproState } from "@/lib/state";
+import { Suspense } from "react";
 
 export default async function VerifyIdentityPage() {
   return (
@@ -13,30 +10,29 @@ export default async function VerifyIdentityPage() {
         <div className="eyebrow">verify target</div>
         <h1>Verify identity</h1>
         <p>
-          This page prepares cookie state <code>onboarding</code> on mount. The button only calls{" "}
+          This page represents the first gated target. The button prepares
+          cookie state
+          <code>onboarding</code>, then calls{" "}
           <code>router.replace("/dashboard")</code>.
         </p>
       </div>
-
       <div className="stack-lg">
-        <Suspense fallback={<div className="panel">Loading verify state...</div>}>
+        <Suspense fallback={<div>Loading state...</div>}>
           <VerifyContent />
         </Suspense>
-
         <div className="panel stack">
           <div>
             <h2 className="card-title">Expected behavior</h2>
             <div className="inline-list">
-              <div>Stay on this page until the next state is prepared.</div>
               <div>
-                Then the first <code>router.replace("/dashboard")</code> should land on{" "}
+                The first <code>router.replace("/dashboard")</code> should land
+                on
                 <code>/onboarding</code>.
               </div>
             </div>
           </div>
-
           <div className="button-row">
-            <GoDashboardButton />
+            <GoToOnboardingButton />
             <ResetButton redirectTo="/" />
           </div>
         </div>
@@ -49,12 +45,8 @@ async function VerifyContent() {
   const state = await getReproState();
 
   return (
-    <div className="stack">
-      <DebugPanel label="verify target" serverState={state} />
-      <PrepareOnboarding currentState={state} />
-      <div className="panel panel-muted">
-        current server state: <code>{state}</code>
-      </div>
+    <div className="panel panel-muted">
+      current server state: <code>{state}</code>
     </div>
   );
 }

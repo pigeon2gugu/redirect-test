@@ -8,7 +8,7 @@ The app is intentionally small and focuses on one sequence:
 /dashboard -> /verify-identity -> /dashboard -> /onboarding -> /dashboard -> /complete
 ```
 
-The important detail is that each target page prepares the **next server state first**, and the button itself only performs `router.replace("/dashboard")`.
+The important detail is that the gated target buttons prepare the **next server state** via a server action, then call `router.replace("/dashboard")`.
 
 ## Versions
 
@@ -42,12 +42,11 @@ State is stored in a single cookie:
 
 1. Visit `/dashboard`
 2. Server redirects to `/verify-identity`
-3. `/verify-identity` prepares cookie state `onboarding` on mount
-4. Click the button that only calls `router.replace("/dashboard")`
-5. Expected result: first attempt lands on `/onboarding`
-6. `/onboarding` prepares cookie state `complete` on mount
-7. Click the button that only calls `router.replace("/dashboard")`
-8. Expected result: first attempt lands on `/complete`
+3. Click the button that prepares cookie state `onboarding`, then calls `router.replace("/dashboard")`
+4. Expected result: first attempt lands on `/onboarding`
+5. Click the button that prepares cookie state `complete`, then calls `router.replace("/dashboard")`
+6. Expected result: first attempt lands on `/complete`
+7. Use the reset button to clear the cookie and restart the cycle
 
 ## Install and run
 
@@ -84,49 +83,31 @@ The patched mode does four things:
 
 ## What to look for
 
-The debug panel on each page shows:
+The key comparison is not whether `Activity` preservation exists at all. With `cacheComponents`, preservation is expected.
 
-- `mountId`
-- `renderCount`
-- `effectCycles`
-- `cleanupCount`
-
-The key comparison is not whether effects replay at all. With `cacheComponents`, replay is expected.
-
-The key comparison is whether preserved inactive routes can still cause duplicate redirect handling.
+The key comparison is whether preserved inactive routes can still cause duplicate redirect handling during forward navigation.
 
 ### Expected stock behavior (`pnpm patch:off`)
 
-In the currently observed repro, the same preserved instance can re-appear more than once before the flow moves forward.
+In the problematic stock behavior, a stage can visibly re-appear before the flow moves forward.
 
-Observed pattern:
+Typical pattern to watch for:
 
-- `verify` appears twice with the same `mountId`
-- `onboarding` appears twice with the same `mountId`
-- `complete` appears once
+- `/verify-identity` appears again before the app reaches `/onboarding`
+- `/onboarding` appears again before the app reaches `/complete`
 
-Example observation:
+In other words, the visible flow can look like:
 
-- `verify1`: `mountId: 1`, `effectCycles: 2`, `cleanupCount: 1`
-- `verify2`: `mountId: 1`, `effectCycles: 3`, `cleanupCount: 2`
-- `onboarding1`: `mountId: 2`, `effectCycles: 2`, `cleanupCount: 1`
-- `onboarding2`: `mountId: 2`, `effectCycles: 3`, `cleanupCount: 2`
-- `complete`: `mountId: 3`, `effectCycles: 1`, `cleanupCount: 0`
+```txt
+verify -> verify -> onboarding -> onboarding -> complete
+```
 
 ### Expected patched behavior (`pnpm patch:on`)
 
-Preserved route instances still exist and effects can still replay, but duplicate redirect handling should disappear.
+With the local patch enabled, the flow should move forward once per stage:
 
-Observed pattern:
-
-- `verify` appears once
-- `onboarding` appears once
-- `complete` appears once
-
-Example observation:
-
-- `verify`: `mountId: 1`, `effectCycles: 2`, `cleanupCount: 1`
-- `onboarding`: `mountId: 2`, `effectCycles: 2`, `cleanupCount: 1`
-- `complete`: `mountId: 3`, `effectCycles: 1`, `cleanupCount: 0`
+```txt
+verify -> onboarding -> complete
+```
 
 This is important: the patch does **not** disable `Activity` preservation. It only prevents inactive preserved `RedirectBoundary` instances from executing redirect side effects again.

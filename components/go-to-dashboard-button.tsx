@@ -2,13 +2,13 @@
 
 import { useRouter } from "next/navigation";
 
-type GoDashboardButtonProps = {
+type GoToDashboardButtonProps = {
   label?: string;
 };
 
-export function GoDashboardButton({
+export function GoToDashboardButton({
   label = 'router.replace("/dashboard")',
-}: GoDashboardButtonProps) {
+}: GoToDashboardButtonProps) {
   const router = useRouter();
 
   return (
