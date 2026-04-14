@@ -17,7 +17,7 @@ The important part is that the button itself does not mutate server state. It on
 
 Replace this with your repro repository URL:
 
-https://github.com/pigeon2gugu/redirect-test
+`<REPO_URL>`
 
 ### To Reproduce
 
@@ -88,6 +88,8 @@ The local patch does four things:
 
 <details>
 <summary>Local patch diff</summary>
+
+This is the minimal relevant diff, not the full file snapshot.
 
 ```diff
 diff --git a/node_modules/next/dist/client/components/layout-router.js b/node_modules/next/dist/client/components/layout-router.js
@@ -161,11 +163,18 @@ diff --git a/node_modules/next/dist/client/components/redirect-boundary.d.ts b/n
 
 ### Verify canary release
 
-Not yet verified against canary.
+Yes. I also reproduced the issue on stock canary.
+
+This was the version resolved by `pnpm add next@canary` at the time of testing.
+
+- tested canary version: `16.2.1-canary.38`
+- result: the duplicate preserved-instance behavior still reproduces with `pnpm patch:off`
+- note: I did not re-apply the local patch comparison on canary yet, because the current patch snapshots were prepared against `16.2.2`
 
 ### Provide environment information
 
-- Next.js: `16.2.2`
+- Next.js stable repro version: `16.2.2`
+- Next.js canary repro version: `16.2.1-canary.38`
 - React: `19.2.4`
 - Node: `20.14.0`
 - pnpm: `10.6.5`
@@ -183,9 +192,12 @@ Not yet verified against canary.
 
 ### Additional context
 
-This is a minimal repro focused on isolating the RedirectBoundary behavior under cacheComponents. The A/B comparison with the local patch demonstrates the specific component responsible.
+I realize this is still a framework-behavior repro rather than a fully minimized proof of the exact production sequence that originally motivated the investigation.
 
-- stock Next: duplicated route participation from the same preserved instance
-- patched Next: one forward transition per stage
+However, this repro does show a meaningful A/B difference on stable, and the stock canary still reproduces the problematic behavior:
+
+- stock stable: duplicated route participation from the same preserved instance
+- patched stable: one forward transition per stage
+- stock canary: duplicated preserved-instance behavior still reproduces
 
 That seems consistent with a hidden preserved `RedirectBoundary` being able to re-run redirect handling when it should no longer affect the active route.
